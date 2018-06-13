@@ -1,13 +1,13 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
+
+	"playground/http2_conn/httpconn"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
@@ -49,34 +49,20 @@ func main() {
 }
 
 func client() {
-	t := &http2.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	dialer := &httpconn.Dialer{
+		InsecureSkipVerify: true,
 	}
-	c := &http.Client{
-		Transport: t,
-	}
-	pr, pw := io.Pipe()
-	req, err := http.NewRequest("MAGIC", "https://localhost:4430/ECHO", ioutil.NopCloser(pr))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	go fmt.Fprintf(pw, "magic\n")
-	res, err := c.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("Got: %#v", res)
+	conn := dialer.Dial("localhost:4430")
 
 	go func() {
 		for {
 			time.Sleep(1 * time.Second)
-			fmt.Fprintf(pw, "It is now %v\n", time.Now())
+			fmt.Fprintf(conn, "It is now %v\n", time.Now())
 		}
 	}()
 
 	go func() {
-		n, err := io.Copy(os.Stdout, res.Body)
+		n, err := io.Copy(os.Stdout, conn)
 		log.Fatalf("copied %d, %v", n, err)
 	}()
 }

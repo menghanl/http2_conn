@@ -1,32 +1,65 @@
 package httpconn
 
 import (
+	"crypto/tls"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
 	"net"
+	"net/http"
 	"time"
+
+	"golang.org/x/net/http2"
 )
 
 // Dialer implements net.Dialer, and creates conn that wrapps around http2.
-type Dialer struct{}
+type Dialer struct {
+	InsecureSkipVerify bool
+}
 
 // Dial creates a conn wrapper on top of a http2 client.
 func (d *Dialer) Dial(target string) net.Conn {
-	return &clientConn{}
+	c := &http.Client{
+		Transport: &http2.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: d.InsecureSkipVerify},
+		},
+	}
+	pr, pw := io.Pipe()
+	req, err := http.NewRequest("MAGIC", "https://"+target+"/ECHO", ioutil.NopCloser(pr))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go fmt.Fprintf(pw, "magic\n")
+	res, err := c.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Got: %#v", res)
+
+	return &clientConn{
+		out: pw,
+		in:  res.Body,
+	}
 }
 
 // clientConn implements net.Conn.
-type clientConn struct{}
+type clientConn struct {
+	out io.Writer
+	in  io.ReadCloser
+}
 
 func (c *clientConn) Read(b []byte) (n int, err error) {
-	return 0, fmt.Errorf("not implemented")
+	return c.in.Read(b)
 }
 
 func (c *clientConn) Write(b []byte) (n int, err error) {
-	return 0, fmt.Errorf("not implemented")
+	return c.out.Write(b)
 }
 
 func (c *clientConn) Close() error {
-	return fmt.Errorf("not implemented")
+	return c.in.Close()
 }
 
 func (c *clientConn) LocalAddr() net.Addr                { return constFakeAddr }
