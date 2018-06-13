@@ -44,7 +44,7 @@ func echoCapitalHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "PUT required.", 400)
 		return
 	}
-	io.Copy(flushWriter{w}, capitalizeReader{r.Body})
+	io.Copy(flushWriter{w}, r.Body)
 }
 
 func server() {
