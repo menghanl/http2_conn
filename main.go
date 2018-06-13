@@ -27,8 +27,8 @@ func (fw flushWriter) Write(p []byte) (n int, err error) {
 
 func server() {
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "PUT" {
-			http.Error(w, "PUT required.", 400)
+		if r.Method != "MAGIC" {
+			http.Error(w, "MAGIC required. Not "+r.Method, 400)
 			return
 		}
 		io.Copy(flushWriter{w}, r.Body)
@@ -56,22 +56,26 @@ func client() {
 		Transport: t,
 	}
 	pr, pw := io.Pipe()
-	req, err := http.NewRequest("PUT", "https://localhost:4430/ECHO", ioutil.NopCloser(pr))
+	req, err := http.NewRequest("MAGIC", "https://localhost:4430/ECHO", ioutil.NopCloser(pr))
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	go fmt.Fprintf(pw, "magic\n")
+	res, err := c.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Got: %#v", res)
+
 	go func() {
 		for {
 			time.Sleep(1 * time.Second)
 			fmt.Fprintf(pw, "It is now %v\n", time.Now())
 		}
 	}()
+
 	go func() {
-		res, err := c.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("Got: %#v", res)
 		n, err := io.Copy(os.Stdout, res.Body)
 		log.Fatalf("copied %d, %v", n, err)
 	}()
