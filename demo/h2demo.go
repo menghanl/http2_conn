@@ -1,9 +1,14 @@
 package main
 
 import (
+	"crypto/tls"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"golang.org/x/net/http2"
 )
@@ -42,24 +47,45 @@ func echoCapitalHandler(w http.ResponseWriter, r *http.Request) {
 	io.Copy(flushWriter{w}, capitalizeReader{r.Body})
 }
 
-func registerHandlers() {
-	mux2 := http.NewServeMux()
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		mux2.ServeHTTP(w, r)
-	})
-	mux2.HandleFunc("/ECHO", echoCapitalHandler)
+func server() {
+	var srv http.Server
+	srv.Addr = ":4430"
+	http.HandleFunc("/ECHO", echoCapitalHandler)
+	http2.ConfigureServer(&srv, &http2.Server{})
+	log.Fatal(srv.ListenAndServeTLS("./tls/server1.pem", "./tls/server1.key"))
 }
 
 func main() {
-	var srv http.Server
-	srv.Addr = ":4430"
-
-	registerHandlers()
-
-	http2.ConfigureServer(&srv, &http2.Server{})
-
-	go func() {
-		log.Fatal(srv.ListenAndServeTLS("./tls/server1.pem", "./tls/server1.key"))
-	}()
+	go server()
+	go client()
 	select {}
+}
+
+func client() {
+	t := &http2.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	c := &http.Client{
+		Transport: t,
+	}
+	pr, pw := io.Pipe()
+	req, err := http.NewRequest("PUT", "https://localhost:4430/ECHO", ioutil.NopCloser(pr))
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		for {
+			time.Sleep(1 * time.Second)
+			fmt.Fprintf(pw, "It is now %v\n", time.Now())
+		}
+	}()
+	go func() {
+		res, err := c.Do(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("Got: %#v", res)
+		n, err := io.Copy(os.Stdout, res.Body)
+		log.Fatalf("copied %d, %v", n, err)
+	}()
 }
