@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 )
 
@@ -21,21 +21,25 @@ func (fw flushWriter) Write(p []byte) (n int, err error) {
 	n, err = fw.w.Write(p)
 	if f, ok := fw.w.(http.Flusher); ok {
 		f.Flush()
-		fmt.Println("flushing")
 	}
 	return
 }
 
 func server() {
 	handler := func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "PUT" {
+			http.Error(w, "PUT required.", 400)
+			return
+		}
 		io.Copy(flushWriter{w}, r.Body)
 	}
 
-	http.HandleFunc("/fakeconn", handler)
 	var srv http.Server
-	srv.Addr = ":8080"
+	srv.Addr = ":4430"
+	http.HandleFunc("/ECHO", handler)
 	http2.ConfigureServer(&srv, &http2.Server{})
-	srv.ListenAndServeTLS("./tls/server1.pem", "./tls/server1.key")
+	log.Fatal(srv.ListenAndServeTLS("./tls/server1.pem", "./tls/server1.key"))
+	// log.Fatal(srv.ListenAndServe())
 }
 
 func main() {
@@ -52,7 +56,7 @@ func client() {
 		Transport: t,
 	}
 	pr, pw := io.Pipe()
-	req, err := http.NewRequest("PUT", "https://localhost:8080/fakeconn", ioutil.NopCloser(pr))
+	req, err := http.NewRequest("PUT", "https://localhost:4430/ECHO", ioutil.NopCloser(pr))
 	if err != nil {
 		log.Fatal(err)
 	}
