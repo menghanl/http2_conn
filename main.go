@@ -3,47 +3,28 @@ package main
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"time"
 
 	"playground/http2_conn/httpconn"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
 )
 
-type flushWriter struct {
-	w io.Writer
-}
-
-func (fw flushWriter) Write(p []byte) (n int, err error) {
-	n, err = fw.w.Write(p)
-	if f, ok := fw.w.(http.Flusher); ok {
-		f.Flush()
-	}
-	return
-}
-
 func server() {
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "MAGIC" {
-			http.Error(w, "MAGIC required. Not "+r.Method, 400)
-			return
+	listener := httpconn.Listen(":4430")
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Fatal(err)
 		}
-		io.Copy(flushWriter{w}, r.Body)
+		go io.Copy(conn, conn)
 	}
-
-	var srv http.Server
-	srv.Addr = ":4430"
-	http.HandleFunc("/ECHO", handler)
-	http2.ConfigureServer(&srv, &http2.Server{})
-	log.Fatal(srv.ListenAndServeTLS("./tls/server1.pem", "./tls/server1.key"))
-	// log.Fatal(srv.ListenAndServe())
 }
 
 func main() {
 	go server()
+	go client()
 	go client()
 	select {}
 }
