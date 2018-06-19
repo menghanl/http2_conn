@@ -6,8 +6,7 @@ import (
 	"os"
 	"time"
 
-	"playground/http2_conn/httpconn"
-
+	"github.com/menghanl/http2_conn/httpconn"
 	log "github.com/sirupsen/logrus"
 )
 
