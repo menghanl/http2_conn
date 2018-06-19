@@ -11,3 +11,5 @@ func (a *fakeAddr) Network() string {
 func (a *fakeAddr) String() string {
 	return "fake_address"
 }
+
+const magicHandshakeStr = "M_a_G_i_C\n"

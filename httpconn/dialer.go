@@ -2,7 +2,6 @@ package httpconn
 
 import (
 	"crypto/tls"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -31,7 +30,15 @@ func (d *Dialer) Dial(target string) net.Conn {
 		log.Fatal(err)
 	}
 
-	go fmt.Fprintf(pw, "magic\n")
+	go func() {
+		// Need to send something as a handshake, otherwise the following Do()
+		// will block. Don't know why...
+		//
+		// Also, if the server tries to read the whole string, it still blocks
+		// (maybe also in Do()). Currently server reads one byte less, but that
+		// needs to be fixed.
+		pw.Write([]byte(magicHandshakeStr))
+	}()
 	res, err := c.Do(req)
 	if err != nil {
 		log.Fatal(err)

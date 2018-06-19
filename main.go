@@ -25,7 +25,6 @@ func server() {
 func main() {
 	go server()
 	go client()
-	go client()
 	select {}
 }
 

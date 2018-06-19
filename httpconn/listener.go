@@ -68,6 +68,15 @@ func (l *listener) Accept() (net.Conn, error) {
 	if !ok {
 		return nil, fmt.Errorf("listener closed")
 	}
+	//
+	// The code blocks indefinitely if the following read() tries to read the
+	// whole magicHandshakeStr.
+	//
+	magicBytes := make([]byte, len(magicHandshakeStr)-1)
+	// if _, err := io.ReadFull(conn, magicBytes); err != nil {
+	if _, err := conn.Read(magicBytes); err != nil {
+		return nil, fmt.Errorf("failed to handshake: %v", err)
+	}
 	return conn, nil
 }
 
