@@ -45,6 +45,12 @@ func (d *Dialer) Dial(target string) net.Conn {
 	}
 	log.Printf("Got: %#v", res)
 
+	magicBytes := make([]byte, len(magicHandshakeStr))
+	// if _, err := io.ReadFull(conn, magicBytes); err != nil {
+	if _, err := res.Body.Read(magicBytes); err != nil {
+		return nil
+	}
+
 	return &clientConn{
 		out: pw,
 		in:  res.Body,
