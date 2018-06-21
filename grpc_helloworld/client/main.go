@@ -2,9 +2,11 @@ package main
 
 import (
 	"log"
+	"net"
 	"os"
 	"time"
 
+	"github.com/menghanl/http2_conn/httpconn"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
@@ -16,8 +18,15 @@ const (
 )
 
 func main() {
+	httpdialer := &httpconn.Dialer{InsecureSkipVerify: true}
+
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address,
+		grpc.WithInsecure(),
+		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
+			return httpdialer.Dial(addr), nil
+		}),
+	)
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
